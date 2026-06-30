@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tick Compare — 28 Pairs · Deriv Live · UTC Day</title>
+<title>Tick Compare — 32 Pairs · Deriv Live · UTC Day</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
@@ -110,14 +110,14 @@ canvas { position: absolute; top: 0; left: 0; }
 <div id="terminal">
   <div id="header">
     <div id="hdr-title">▌MULTI-PAIR TICK COMPARE</div>
-    <div id="hdr-sub">28 Pairs (26 FX + XAG + XAU + BTC + ETH) · Deriv Live · UTC day · 5s buckets · normalized from 00:00 UTC open</div>
+    <div id="hdr-sub">32 Pairs (28 FX + XAG + XAU + XPD + XPT) · Deriv Live · UTC day · 5s buckets · normalized from 00:00 UTC open</div>
     <div id="hdr-right">
-          <div class="live-dot" id="live-dot"></div>
-          <div class="hdr-meta" id="hdr-time">--:--:--</div>
-          <div class="hdr-meta" id="conn-status">Connecting…</div>
-          <div class="hdr-meta" id="backfill-status"></div>
-          <div class="hdr-meta" id="cycle-lbl">Hour 1</div>
-        </div>
+      <div class="live-dot" id="live-dot"></div>
+      <div class="hdr-meta" id="hdr-time">--:--:--</div>
+      <div class="hdr-meta" id="conn-status">Connecting…</div>
+      <div class="hdr-meta" id="backfill-status"></div>
+      <div class="hdr-meta" id="cycle-lbl">Day 1</div>
+    </div>
   </div>
   <div id="legend-bar"></div>
   <div id="timer-bar">
@@ -126,7 +126,7 @@ canvas { position: absolute; top: 0; left: 0; }
   </div>
   <div id="chart-wrap">
     <canvas id="chart"></canvas>
-    <div id="reset-badge">↺ NEW HOUR…</div>
+    <div id="reset-badge">↺ NEW UTC DAY…</div>
   </div>
   <div id="footer">
     <div class="fi">MODE: <b>NORMALIZED %Δ FROM 00:00 UTC OPEN</b></div>
@@ -153,14 +153,41 @@ canvas { position: absolute; top: 0; left: 0; }
 const WS_URL = 'wss://ws.derivws.com/websockets/v3?app_id=1089';
 
 const PAIRS = [
-  { label:'VOL 10 (1s)',  sym:'1HZ10V',  color:'#3399ff' },
-  { label:'VOL 25 (1s)',  sym:'1HZ25V',  color:'#00ff99' },
-  { label:'VOL 50 (1s)',  sym:'1HZ50V',  color:'#ff8800' },
-  { label:'VOL 75 (1s)',  sym:'1HZ75V',  color:'#9988ff' },
-  { label:'VOL 100 (1s)', sym:'1HZ100V', color:'#ffcc00' },
+  { label:'AUDCAD', sym:'frxAUDCAD', color:'#ff4d4d' },
+  { label:'AUDCHF', sym:'frxAUDCHF', color:'#ff7f4d' },
+  { label:'AUDJPY', sym:'frxAUDJPY', color:'#ffb14d' },
+  { label:'AUDNZD', sym:'frxAUDNZD', color:'#ffe34d' },
+  { label:'AUDUSD', sym:'frxAUDUSD', color:'#e3ff4d' },
+  { label:'EURAUD', sym:'frxEURAUD', color:'#b1ff4d' },
+  { label:'EURCAD', sym:'frxEURCAD', color:'#7fff4d' },
+  { label:'EURCHF', sym:'frxEURCHF', color:'#4dff5e' },
+  { label:'EURGBP', sym:'frxEURGBP', color:'#4dff90' },
+  { label:'EURJPY', sym:'frxEURJPY', color:'#4dffc2' },
+  { label:'EURNZD', sym:'frxEURNZD', color:'#4dfff4' },
+  { label:'EURUSD', sym:'frxEURUSD', color:'#4dd4ff' },
+  { label:'GBPAUD', sym:'frxGBPAUD', color:'#4da2ff' },
+  { label:'GBPCAD', sym:'frxGBPCAD', color:'#4d70ff' },
+  { label:'GBPCHF', sym:'frxGBPCHF', color:'#4d4dff' },
+  { label:'GBPJPY', sym:'frxGBPJPY', color:'#7f4dff' },
+  { label:'GBPNOK', sym:'frxGBPNOK', color:'#b14dff' },
+  { label:'GBPNZD', sym:'frxGBPNZD', color:'#e34dff' },
+  { label:'GBPUSD', sym:'frxGBPUSD', color:'#ff4de3' },
+  { label:'NZDJPY', sym:'frxNZDJPY', color:'#ff4db1' },
+  { label:'NZDUSD', sym:'frxNZDUSD', color:'#ff4d7f' },
+  { label:'USDCAD', sym:'frxUSDCAD', color:'#ff6666' },
+  { label:'USDCHF', sym:'frxUSDCHF', color:'#ff9933' },
+  { label:'USDJPY', sym:'frxUSDJPY', color:'#ffcc00' },
+  { label:'USDMXN', sym:'frxUSDMXN', color:'#ccff33' },
+  { label:'USDNOK', sym:'frxUSDNOK', color:'#66ff66' },
+  { label:'USDPLN', sym:'frxUSDPLN', color:'#33ffcc' },
+  { label:'USDSEK', sym:'frxUSDSEK', color:'#33ccff' },
+  { label:'XAGUSD', sym:'frxXAGUSD', color:'#c0c0c0' },
+  { label:'XAUUSD', sym:'frxXAUUSD', color:'#ffd700' },
+  { label:'XPDUSD', sym:'frxXPDUSD', color:'#8884d8' },
+  { label:'XPTUSD', sym:'frxXPTUSD', color:'#82ca9d' },
 ];
 
-const DAY_SECONDS      = 3600;     // mapped window now 1 hour
+const DAY_SECONDS      = 3600;      // mapped cycle = 1 hour, then resets
 const BUCKET_SECONDS   = 5;         // per-node resolution
 const BUCKETS_PER_DAY  = DAY_SECONDS / BUCKET_SECONDS; // 17280
 const MAX_LIVE_MARKERS = 6;         // only draw circle markers on the most recent N buckets per pair
@@ -226,16 +253,16 @@ PAIRS.forEach(p => { bootState[p.sym] = 'wait'; });
 ═══════════════════════════════════════════════ */
 function getTodayMidnightMs() {
   const now = Date.now();
-  return now - (now % 3600000);
+  return now - (now % (DAY_SECONDS * 1000));
 }
 function getElapsedSec() {
-  return (Date.now() % 3600000) / 1000;
+  return (Date.now() % (DAY_SECONDS * 1000)) / 1000;
 }
 function bucketIndexFor(elapsedSec) {
   return Math.min(BUCKETS_PER_DAY - 1, Math.floor(elapsedSec / BUCKET_SECONDS));
 }
 function todayDateStr() {
-  return new Date(dayOpenMs).toISOString().slice(0, 13); // YYYY-MM-DDTHH, used as cache key
+  return new Date(dayOpenMs).toISOString().slice(0, 10); // YYYY-MM-DD, used as cache key
 }
 
 /* ═══════════════════════════════════════════════
@@ -656,8 +683,8 @@ function resetDay() {
   unsubscribeAll();
   setTimeout(() => {
     dayNum++;
-        dayOpenMs = getTodayMidnightMs();
-        document.getElementById('cycle-lbl').textContent = 'Hour ' + dayNum;
+    dayOpenMs = getTodayMidnightMs();
+    document.getElementById('cycle-lbl').textContent = 'Day ' + dayNum;
 
     pairData.forEach(p => {
       p.buckets = new Map();
@@ -679,8 +706,8 @@ function resetDay() {
     const fresh = document.createElement('div');
     fresh.id = 'bootOverlay';
     fresh.innerHTML = `
-          <div id="bootInner">
-            <div id="bootTitle">⬡ NEW HOUR — BACKFILL BOOT SEQUENCE</div>
+      <div id="bootInner">
+        <div id="bootTitle">⬡ NEW UTC DAY — BACKFILL BOOT SEQUENCE</div>
         <div id="bootBarTrack"><div id="bootBarFill"></div></div>
         <div id="bootGrid"></div>
         <div id="bootLogBox"><div id="bootLogLines"></div></div>
@@ -865,10 +892,10 @@ function updateTimerUI() {
   document.getElementById('timer-txt').textContent  = fmtHMS(elapsed) + ' / 01:00:00';
   document.getElementById('hdr-time').textContent   = new Date().toUTCString().slice(17, 25) + ' UTC';
 
-  // Detect UTC midnight rollover: elapsed wraps from ~86399 back to ~0
-  if (elapsed < lastElapsed - 1 && !resetting) {
-    resetDay();
-  }
+  // Detect cycle rollover: elapsed wraps from ~(DAY_SECONDS-1) back to ~0
+    if (elapsed < lastElapsed - 1 && !resetting) {
+      resetDay();
+    }
   lastElapsed = elapsed;
 }
 
