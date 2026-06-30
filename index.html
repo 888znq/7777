@@ -112,21 +112,21 @@ canvas { position: absolute; top: 0; left: 0; }
     <div id="hdr-title">▌MULTI-PAIR TICK COMPARE</div>
     <div id="hdr-sub">28 Pairs (26 FX + XAG + XAU + BTC + ETH) · Deriv Live · UTC day · 5s buckets · normalized from 00:00 UTC open</div>
     <div id="hdr-right">
-      <div class="live-dot" id="live-dot"></div>
-      <div class="hdr-meta" id="hdr-time">--:--:--</div>
-      <div class="hdr-meta" id="conn-status">Connecting…</div>
-      <div class="hdr-meta" id="backfill-status"></div>
-      <div class="hdr-meta" id="cycle-lbl">Day 1</div>
-    </div>
+          <div class="live-dot" id="live-dot"></div>
+          <div class="hdr-meta" id="hdr-time">--:--:--</div>
+          <div class="hdr-meta" id="conn-status">Connecting…</div>
+          <div class="hdr-meta" id="backfill-status"></div>
+          <div class="hdr-meta" id="cycle-lbl">Hour 1</div>
+        </div>
   </div>
   <div id="legend-bar"></div>
   <div id="timer-bar">
     <div id="timer-track"><div id="timer-fill"></div></div>
-    <div id="timer-txt">00:00:00 / 24:00:00</div>
+    <div id="timer-txt">00:00:00 / 01:00:00</div>
   </div>
   <div id="chart-wrap">
     <canvas id="chart"></canvas>
-    <div id="reset-badge">↺ NEW UTC DAY…</div>
+    <div id="reset-badge">↺ NEW HOUR…</div>
   </div>
   <div id="footer">
     <div class="fi">MODE: <b>NORMALIZED %Δ FROM 00:00 UTC OPEN</b></div>
@@ -160,7 +160,7 @@ const PAIRS = [
   { label:'VOL 100 (1s)', sym:'1HZ100V', color:'#ffcc00' },
 ];
 
-const DAY_SECONDS      = 86400;     // full UTC day
+const DAY_SECONDS      = 3600;     // mapped window now 1 hour
 const BUCKET_SECONDS   = 5;         // per-node resolution
 const BUCKETS_PER_DAY  = DAY_SECONDS / BUCKET_SECONDS; // 17280
 const MAX_LIVE_MARKERS = 6;         // only draw circle markers on the most recent N buckets per pair
@@ -226,16 +226,16 @@ PAIRS.forEach(p => { bootState[p.sym] = 'wait'; });
 ═══════════════════════════════════════════════ */
 function getTodayMidnightMs() {
   const now = Date.now();
-  return now - (now % 86400000);
+  return now - (now % 3600000);
 }
 function getElapsedSec() {
-  return (Date.now() % 86400000) / 1000;
+  return (Date.now() % 3600000) / 1000;
 }
 function bucketIndexFor(elapsedSec) {
   return Math.min(BUCKETS_PER_DAY - 1, Math.floor(elapsedSec / BUCKET_SECONDS));
 }
 function todayDateStr() {
-  return new Date(dayOpenMs).toISOString().slice(0, 10); // YYYY-MM-DD, used as cache key
+  return new Date(dayOpenMs).toISOString().slice(0, 13); // YYYY-MM-DDTHH, used as cache key
 }
 
 /* ═══════════════════════════════════════════════
@@ -656,8 +656,8 @@ function resetDay() {
   unsubscribeAll();
   setTimeout(() => {
     dayNum++;
-    dayOpenMs = getTodayMidnightMs();
-    document.getElementById('cycle-lbl').textContent = 'Day ' + dayNum;
+        dayOpenMs = getTodayMidnightMs();
+        document.getElementById('cycle-lbl').textContent = 'Hour ' + dayNum;
 
     pairData.forEach(p => {
       p.buckets = new Map();
@@ -679,8 +679,8 @@ function resetDay() {
     const fresh = document.createElement('div');
     fresh.id = 'bootOverlay';
     fresh.innerHTML = `
-      <div id="bootInner">
-        <div id="bootTitle">⬡ NEW UTC DAY — BACKFILL BOOT SEQUENCE</div>
+          <div id="bootInner">
+            <div id="bootTitle">⬡ NEW HOUR — BACKFILL BOOT SEQUENCE</div>
         <div id="bootBarTrack"><div id="bootBarFill"></div></div>
         <div id="bootGrid"></div>
         <div id="bootLogBox"><div id="bootLogLines"></div></div>
@@ -862,7 +862,7 @@ function fmtHMS(sec) {
 function updateTimerUI() {
   const elapsed = getElapsedSec();
   document.getElementById('timer-fill').style.width = (elapsed / DAY_SECONDS * 100) + '%';
-  document.getElementById('timer-txt').textContent  = fmtHMS(elapsed) + ' / 24:00:00';
+  document.getElementById('timer-txt').textContent  = fmtHMS(elapsed) + ' / 01:00:00';
   document.getElementById('hdr-time').textContent   = new Date().toUTCString().slice(17, 25) + ' UTC';
 
   // Detect UTC midnight rollover: elapsed wraps from ~86399 back to ~0
