@@ -153,10 +153,11 @@ canvas { position: absolute; top: 0; left: 0; }
 const WS_URL = 'wss://ws.derivws.com/websockets/v3?app_id=1089';
 
 const PAIRS = [
-  { label:'EUR/USD', sym:'frxEURUSD', color:'#3399ff' },
-  { label:'GBP/USD', sym:'frxGBPUSD', color:'#00ff99' },
-  { label:'BTC/USD', sym:'cryBTCUSD', color:'#ff8800' },
-  { label:'ETH/USD', sym:'cryETHUSD', color:'#9988ff' },
+  { label:'VOL 10 (1s)',  sym:'1HZ10V',  color:'#3399ff' },
+  { label:'VOL 25 (1s)',  sym:'1HZ25V',  color:'#00ff99' },
+  { label:'VOL 50 (1s)',  sym:'1HZ50V',  color:'#ff8800' },
+  { label:'VOL 75 (1s)',  sym:'1HZ75V',  color:'#9988ff' },
+  { label:'VOL 100 (1s)', sym:'1HZ100V', color:'#ffcc00' },
 ];
 
 const DAY_SECONDS      = 86400;     // full UTC day
@@ -748,13 +749,23 @@ function draw() {
     totalBuckets += p.bucketKeys.length;
     if (p.bucketKeys.length < 2) return;
 
-    const path = new Path2D();
-    p.bucketKeys.forEach((k, i) => {
-      const tk = p.buckets.get(k);
-      const x = mapX(tk.elapsed);
-      const y = mapY(tk.pct, lo, hi);
-      i === 0 ? path.moveTo(x, y) : path.lineTo(x, y);
-    });
+    const pts = p.bucketKeys.map(k => {
+          const tk = p.buckets.get(k);
+          return { x: mapX(tk.elapsed), y: mapY(tk.pct, lo, hi) };
+        });
+        const path = new Path2D();
+        if (pts.length > 0) {
+          path.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length - 1; i++) {
+            const xc = (pts[i].x + pts[i + 1].x) / 2;
+            const yc = (pts[i].y + pts[i + 1].y) / 2;
+            path.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+          }
+          if (pts.length > 1) {
+            const last = pts[pts.length - 1];
+            path.lineTo(last.x, last.y);
+          }
+        }
 
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
