@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tick Compare — 28 Pairs · Deriv Live · UTC Day</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  background: #000432;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+}
+#terminal {
+  width: 100vw; height: 100vh;
+  display: flex; flex-direction: column;
+  background: #000432;
+}
+#header {
+  background: #0d1420;
+  border-bottom: 1px solid #1a2a3a;
+  padding: 0 14px;
+  display: flex; align-items: center; gap: 14px;
+  height: 30px; flex-shrink: 0;
+}
+#hdr-title { color: #4a9eff; font-size: 11px; font-weight: 700; letter-spacing: 2px; white-space: nowrap; }
+#hdr-sub   { color: #2a3d52; font-size: 10px; white-space: nowrap; }
+#hdr-right { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+.live-dot  { width: 6px; height: 6px; border-radius: 50%; background: #666; flex-shrink: 0; }
+.live-dot.on { background: #22cc66; animation: blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.hdr-meta { font-size: 10px; color: #2a3d52; white-space: nowrap; }
+#conn-status { font-size: 10px; color: #556; }
+#backfill-status { font-size: 10px; color: #ffaa00; }
+
+#legend-bar {
+  background: #080d17;
+  border-bottom: 1px solid #111d2a;
+  padding: 0 14px;
+  display: flex; gap: 14px; align-items: center;
+  height: 26px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
+}
+#legend-bar::-webkit-scrollbar { height: 2px; }
+#legend-bar::-webkit-scrollbar-thumb { background: #1a2a3a; }
+.leg { display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0; }
+.leg-line  { width: 14px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+.leg-name  { font-size: 9px; font-weight: 700; }
+.leg-px    { font-size: 9px; color: #334455; margin-left: 1px; }
+.leg-pct   { font-size: 9px; }
+
+#timer-bar {
+  background: #070b12;
+  padding: 2px 14px;
+  display: flex; align-items: center; gap: 10px;
+  height: 14px; flex-shrink: 0;
+}
+#timer-track { flex: 1; height: 2px; background: #0f1c2a; border-radius: 1px; overflow: hidden; }
+#timer-fill  { height: 100%; width: 0%; background: #4a9eff; border-radius: 1px; transition: width .3s linear; }
+#timer-txt   { font-size: 9px; color: #2a3d52; min-width: 90px; text-align: right; }
+
+#chart-wrap { flex: 1; position: relative; min-height: 0; }
+canvas { position: absolute; top: 0; left: 0; }
+#reset-badge {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  background: rgba(7,11,18,0.96);
+  border: 1px solid #2a4a7a;
+  color: #4a9eff; font-size: 13px; font-weight: 700;
+  padding: 10px 28px; border-radius: 4px;
+  display: none; letter-spacing: 2px; z-index: 10;
+}
+#footer {
+  background: #06090f;
+  border-top: 1px solid #111d2a;
+  padding: 0 14px;
+  display: flex; gap: 20px; align-items: center;
+  height: 22px; flex-shrink: 0;
+}
+.fi   { font-size: 9px; color: #2a3d52; white-space: nowrap; }
+.fi b { color: #3a5570; }
+
+/* ── BOOT OVERLAY ── */
+#bootOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000432; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#bootOverlay.hide { transition: opacity .6s ease; opacity: 0; pointer-events: none; }
+#bootInner { width: 640px; max-width: 94vw; }
+#bootTitle {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.3em; color: #4a9eff;
+  text-shadow: 0 0 10px rgba(74,158,255,0.5); margin-bottom: 18px; text-align: center;
+}
+#bootBarTrack { background: #000432; border: 1px solid #fff; border-radius: 2px; height: 6px; margin-bottom: 18px; overflow: hidden; }
+#bootBarFill { height: 100%; width: 0%; background: #4a9eff; box-shadow: 0 0 8px rgba(74,158,255,0.7); transition: width 0.3s ease; }
+#bootGrid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 16px;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.05em;
+}
+.boot-cell { padding: 3px 4px; border: 1px solid #1a2a3a; border-radius: 2px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bootLogBox {
+  background: #000432; border: 1px solid #1a2a3a; border-radius: 2px; padding: 10px 14px;
+  height: 130px; overflow-y: auto; display: flex; flex-direction: column-reverse;
+}
+#bootLogLines div { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 1px 0; font-family: 'Courier New', monospace; }
+#bootStatusLine { margin-top: 10px; font-size: 9px; color: #aab; font-weight: 800; letter-spacing: 0.15em; text-align: center; }
+</style>
+</head>
+<body>
+<div id="terminal">
+  <div id="header">
+    <div id="hdr-title">▌MULTI-PAIR TICK COMPARE</div>
+    <div id="hdr-sub">28 Pairs (26 FX + XAG + XAU + BTC + ETH) · Deriv Live · UTC day · 5s buckets · normalized from 00:00 UTC open</div>
+    <div id="hdr-right">
+      <div class="live-dot" id="live-dot"></div>
+      <div class="hdr-meta" id="hdr-time">--:--:--</div>
+      <div class="hdr-meta" id="conn-status">Connecting…</div>
+      <div class="hdr-meta" id="backfill-status"></div>
+      <div class="hdr-meta" id="cycle-lbl">Day 1</div>
+    </div>
+  </div>
+  <div id="legend-bar"></div>
+  <div id="timer-bar">
+    <div id="timer-track"><div id="timer-fill"></div></div>
+    <div id="timer-txt">00:00:00 / 24:00:00</div>
+  </div>
+  <div id="chart-wrap">
+    <canvas id="chart"></canvas>
+    <div id="reset-badge">↺ NEW UTC DAY…</div>
+  </div>
+  <div id="footer">
+    <div class="fi">MODE: <b>NORMALIZED %Δ FROM 00:00 UTC OPEN</b></div>
+    <div class="fi" id="f-leader">LEADER: <b>—</b></div>
+    <div class="fi" id="f-laggard">LAGGARD: <b>—</b></div>
+    <div class="fi" style="margin-left:auto" id="f-points">BUCKETS: <b>—</b></div>
+  </div>
+</div>
+
+<div id="bootOverlay">
+  <div id="bootInner">
+    <div id="bootTitle">⬡ TICK COMPARE — BACKFILL BOOT SEQUENCE</div>
+    <div id="bootBarTrack"><div id="bootBarFill"></div></div>
+    <div id="bootGrid"></div>
+    <div id="bootLogBox"><div id="bootLogLines"></div></div>
+    <div id="bootStatusLine">INITIALIZING...</div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════ */
+const WS_URL = 'wss://ws.derivws.com/websockets/v3?app_id=1089';
+
+const PAIRS = [
+  { label:'EUR/USD', sym:'frxEURUSD', color:'#3399ff' },
+  { label:'GBP/USD', sym:'frxGBPUSD', color:'#00ff99' },
+  { label:'BTC/USD', sym:'cryBTCUSD', color:'#ff8800' },
+  { label:'ETH/USD', sym:'cryETHUSD', color:'#9988ff' },
+];
+
+const DAY_SECONDS      = 86400;     // full UTC day
+const BUCKET_SECONDS   = 5;         // per-node resolution
+const BUCKETS_PER_DAY  = DAY_SECONDS / BUCKET_SECONDS; // 17280
+const MAX_LIVE_MARKERS = 6;         // only draw circle markers on the most recent N buckets per pair
+
+// ── Backfill tuning (ported from the robust pattern) ──
+const CHUNK_SECONDS     = 3600;     // max span per ticks_history request
+const GAP_THRESHOLD     = 60;       // ignore natural gaps smaller than this (seconds)
+const FETCH_WORKERS     = 3;        // concurrent chunk requests per pair, per batch
+const STAGGER_MS        = 700;      // stagger between concurrent chunk starts
+const MAX_RETRIES       = 3;        // retries per chunk before giving up
+const INTER_BATCH_PAUSE = 600;      // ms pause between chunk batches
+const INTER_PAIR_PAUSE  = 350;      // ms pause between pairs (sequential processing)
+
+const PAD = { l: 4, r: 90, t: 4, b: 4 };
+
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+const canvas = document.getElementById('chart');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0;
+
+let dayNum    = 1;
+let dayOpenMs = null;     // epoch ms of today's 00:00 UTC
+let resetting = false;
+let wsReady   = false;
+let lastElapsed = 0;
+
+// Per-pair runtime. buckets is a sparse Map: bucketIndex -> { elapsed, pct }
+const pairData = PAIRS.map(p => ({
+  ...p,
+  buckets    : new Map(),
+  bucketKeys : [],      // sorted list of filled bucket indices, maintained incrementally
+  open       : null,    // first price seen at/after today's 00:00 UTC
+  price      : null,
+  lastBucketIdx: -1,
+  backfilled : false,
+}));
+
+const symToIdx = {};
+PAIRS.forEach((p, i) => { symToIdx[p.sym] = i; });
+
+// Raw tick maps kept alongside buckets so we can gap-detect / cache by epoch-second.
+// { sym: { epochSec: price } }
+const tickMaps = {};
+PAIRS.forEach(p => { tickMaps[p.sym] = {}; });
+
+// Live ticks that arrive WHILE a pair's backfill is still running get buffered here,
+// then merged in once that pair's backfill finishes — so nothing is ever dropped.
+const liveBuffer = {};
+PAIRS.forEach(p => { liveBuffer[p.sym] = {}; });
+
+// Per-pair boot status: wait | cache | fetching | done | err
+const bootState = {};
+PAIRS.forEach(p => { bootState[p.sym] = 'wait'; });
+
+/* ═══════════════════════════════════════════════
+   UTC DAY HELPERS
+   Date.now() % 86400000 gives ms-since-midnight directly,
+   because the Unix epoch itself is a UTC midnight — no
+   timezone math needed, and it self-corrects every frame
+   even if the tab was throttled/backgrounded.
+═══════════════════════════════════════════════ */
+function getTodayMidnightMs() {
+  const now = Date.now();
+  return now - (now % 86400000);
+}
+function getElapsedSec() {
+  return (Date.now() % 86400000) / 1000;
+}
+function bucketIndexFor(elapsedSec) {
+  return Math.min(BUCKETS_PER_DAY - 1, Math.floor(elapsedSec / BUCKET_SECONDS));
+}
+function todayDateStr() {
+  return new Date(dayOpenMs).toISOString().slice(0, 10); // YYYY-MM-DD, used as cache key
+}
+
+/* ═══════════════════════════════════════════════
+   INDEXEDDB CACHE LAYER
+═══════════════════════════════════════════════ */
+const DB_NAME = 'TickCompareCache';
+const STORE_NAME = 'tick_cache';
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore(STORE_NAME); };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+function cacheKey(sym, dateStr) { return `tc_${sym}_${dateStr}`; }
+
+async function cacheRead(sym, dateStr) {
+  try {
+    const db = await initDB();
+    return new Promise(resolve => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(cacheKey(sym, dateStr));
+      req.onsuccess = e => resolve(e.target.result || null);
+      req.onerror   = () => resolve(null);
+    });
+  } catch (e) { return null; }
+}
+async function cacheWrite(sym, dateStr, tickMap) {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put({ tickMap }, cacheKey(sym, dateStr));
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => reject();
+    });
+  } catch (e) { /* non-fatal */ }
+}
+
+/* ═══════════════════════════════════════════════
+   LEGEND
+═══════════════════════════════════════════════ */
+const legendBar = document.getElementById('legend-bar');
+pairData.forEach(p => {
+  const d = document.createElement('div');
+  d.className = 'leg';
+  d.innerHTML =
+    `<div class="leg-line" style="background:${p.color}"></div>`+
+    `<span class="leg-name" style="color:${p.color}">${p.label}</span>`+
+    `<span class="leg-px"  id="lp-${p.label}">-</span>`+
+    `<span class="leg-pct" id="ld-${p.label}" style="color:#445566">—</span>`;
+  legendBar.appendChild(d);
+});
+
+/* ═══════════════════════════════════════════════
+   BOOT OVERLAY UI
+═══════════════════════════════════════════════ */
+function bootLog(msg, color) {
+  const box = document.getElementById('bootLogLines');
+  if (!box) return;
+  const line = document.createElement('div');
+  line.style.color = color || '#aab';
+  const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  line.textContent = `[${ts}] ${msg}`;
+  box.appendChild(line);
+  box.parentElement.scrollTop = box.parentElement.scrollHeight;
+}
+function bootStatusLine(msg) {
+  const el = document.getElementById('bootStatusLine');
+  if (el) el.textContent = msg;
+}
+function bootProgress(done, total) {
+  const bar = document.getElementById('bootBarFill');
+  if (bar) bar.style.width = `${Math.round((done / Math.max(1, total)) * 100)}%`;
+}
+function bootGridRender() {
+  const grid = document.getElementById('bootGrid');
+  if (!grid) return;
+  const colorMap = { wait: '#1a2a3a', cache: '#ffd700', fetching: '#4a9eff', done: '#22cc66', err: '#ff4444' };
+  const iconMap  = { wait: '○', cache: '◐', fetching: '◑', done: '●', err: '✕' };
+  grid.innerHTML = PAIRS.map(p => {
+    const st = bootState[p.sym];
+    return `<div class="boot-cell" style="color:${colorMap[st]};border-color:${colorMap[st]}33;">${iconMap[st]} ${p.label}</div>`;
+  }).join('');
+}
+function bootDone() {
+  const overlay = document.getElementById('bootOverlay');
+  if (!overlay) return;
+  overlay.classList.add('hide');
+  setTimeout(() => overlay.remove(), 650);
+}
+
+/* ═══════════════════════════════════════════════
+   BUCKET INSERT (shared by backfill + live)
+═══════════════════════════════════════════════ */
+function insertTick(p, epochMs, price) {
+  if (p.open === null) p.open = price;
+  p.price = price;
+
+  const elapsed = (epochMs - dayOpenMs) / 1000;
+  if (elapsed < 0 || elapsed >= DAY_SECONDS) return; // outside today's UTC window
+
+  const idx = bucketIndexFor(elapsed);
+  const pct = (price - p.open) / p.open * 100;
+
+  if (!p.buckets.has(idx)) p.bucketKeys.push(idx);
+  p.buckets.set(idx, { elapsed, pct });
+  p.lastBucketIdx = idx;
+}
+
+function finalizeBucketKeys(p) {
+  p.bucketKeys.sort((a, b) => a - b);
+}
+
+// Rebuild a pair's bucket map fully from its raw tickMap (used after backfill merges).
+function rebuildBucketsFromTickMap(p) {
+  p.buckets = new Map();
+  p.bucketKeys = [];
+  p.open = null;
+  p.price = null;
+  p.lastBucketIdx = -1;
+
+  const map = tickMaps[p.sym];
+  const epochs = Object.keys(map).map(Number).sort((a, b) => a - b);
+  for (let i = 0; i < epochs.length; i++) {
+    const sec = epochs[i];
+    insertTick(p, sec * 1000, map[sec]);
+  }
+  finalizeBucketKeys(p);
+}
+
+/* ═══════════════════════════════════════════════
+   GAP DETECTION + CHUNKING
+═══════════════════════════════════════════════ */
+function detectGaps(tickMap, startSec, endSec) {
+  const gaps = [];
+  let gapStart = -1;
+  for (let s = startSec; s <= endSec; s++) {
+    if (tickMap[s] === undefined) {
+      if (gapStart === -1) gapStart = s;
+    } else {
+      if (gapStart !== -1) {
+        if ((s - 1) - gapStart >= GAP_THRESHOLD) gaps.push({ s: gapStart, e: s - 1 });
+        gapStart = -1;
+      }
+    }
+  }
+  // Trailing gap up to "now" always counts — that's live edge catch-up, not natural silence.
+  if (gapStart !== -1) gaps.push({ s: gapStart, e: endSec });
+  return gaps;
+}
+
+function splitIntoChunks(gaps) {
+  const chunks = [];
+  gaps.forEach(g => {
+    for (let s = g.s; s <= g.e; s += CHUNK_SECONDS + 1) {
+      chunks.push({ s, e: Math.min(s + CHUNK_SECONDS, g.e) });
+    }
+  });
+  return chunks;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ═══════════════════════════════════════════════
+   DERIV WEBSOCKET — short-lived per-chunk connections
+   for backfill (isolated, retryable), separate from the
+   persistent live ticks socket.
+═══════════════════════════════════════════════ */
+function fetchChunk(sym, startSec, endSec) {
+  return new Promise(resolve => {
+    let cws;
+    let done = false;
+    try { cws = new WebSocket(WS_URL); } catch (e) { resolve({}); return; }
+    const t = setTimeout(() => {
+      if (!done) { done = true; try { cws.close(); } catch (e) {} resolve({}); }
+    }, 20000);
+    cws.onopen = () => {
+      if (!done) {
+        cws.send(JSON.stringify({ ticks_history: sym, start: startSec, end: endSec, count: 5000, style: 'ticks' }));
+      }
+    };
+    cws.onmessage = ev => {
+      if (done) return;
+      try {
+        const d = JSON.parse(ev.data);
+        if (d.history) {
+          const ts = d.history.times || [], ps = d.history.prices || [];
+          const map = {};
+          for (let i = 0; i < ts.length; i++) map[ts[i]] = ps[i];
+          done = true; clearTimeout(t); try { cws.close(); } catch (e) {} resolve(map);
+        } else if (d.error) {
+          done = true; clearTimeout(t); try { cws.close(); } catch (e) {} resolve({});
+        }
+      } catch (e) {
+        done = true; clearTimeout(t); try { cws.close(); } catch (e2) {} resolve({});
+      }
+    };
+    cws.onerror = () => { if (!done) { done = true; clearTimeout(t); try { cws.close(); } catch (e) {} resolve({}); } };
+    cws.onclose = () => { if (!done) { done = true; clearTimeout(t); resolve({}); } };
+  });
+}
+
+async function fetchChunksSafely(sym, chunks, tickMap) {
+  for (let i = 0; i < chunks.length; i += FETCH_WORKERS) {
+    const batch = chunks.slice(i, i + FETCH_WORKERS);
+
+    const results = await Promise.all(batch.map(async (chunk, idx) => {
+      let map = {};
+      let retries = 0;
+      let delay = idx * STAGGER_MS;
+
+      while (retries <= MAX_RETRIES) {
+        await sleep(delay);
+        map = await fetchChunk(sym, chunk.s, chunk.e);
+        if (Object.keys(map).length > 0 || (chunk.e - chunk.s) < GAP_THRESHOLD) break;
+        retries++;
+        if (retries <= MAX_RETRIES) {
+          bootLog(`${sym} — chunk retry (${retries}/${MAX_RETRIES})`, '#ffd700');
+          delay = 2000 * retries;
+        }
+      }
+      return map;
+    }));
+
+    results.forEach(map => Object.assign(tickMap, map));
+    if (i + FETCH_WORKERS < chunks.length) await sleep(INTER_BATCH_PAUSE);
+  }
+}
+
+/* ─── Phase 1: hydrate from IndexedDB cache (instant) ─── */
+async function hydrateFromCache() {
+  bootStatusLine('PHASE 1 — Reading local cache…');
+  const dateStr = todayDateStr();
+  let hits = 0;
+
+  const reads = await Promise.all(pairData.map(p => cacheRead(p.sym, dateStr)));
+  reads.forEach((cached, i) => {
+    const p = pairData[i];
+    if (cached && cached.tickMap && Object.keys(cached.tickMap).length > 0) {
+      Object.assign(tickMaps[p.sym], cached.tickMap);
+      rebuildBucketsFromTickMap(p);
+      bootState[p.sym] = 'cache';
+      hits++;
+    }
+  });
+
+  bootGridRender();
+  bootLog(`[SYNC LOCAL] ${hits}/${PAIRS.length} pairs hydrated from cache`, hits > 0 ? '#ffd700' : '#778');
+  draw(); // render whatever cache gave us immediately, before phase 2 even starts
+}
+
+/* ─── Phase 2: gap-fill against the live feed, sequential per pair ─── */
+async function backfillAllPairs() {
+  bootStatusLine('PHASE 2 — Backfilling gaps…');
+  document.getElementById('backfill-status').textContent = 'Backfilling 00:00 UTC → now…';
+
+  const dateStr   = todayDateStr();
+  const startSec  = Math.floor(dayOpenMs / 1000);
+  const nowSec    = Math.floor(Date.now() / 1000);
+  let doneCount   = 0;
+
+  for (let i = 0; i < pairData.length; i++) {
+    const p = pairData[i];
+    const sym = p.sym;
+    if (bootState[sym] !== 'cache') bootState[sym] = 'fetching';
+    bootGridRender();
+
+    try {
+      const tickMap = tickMaps[sym];
+      const gaps = detectGaps(tickMap, startSec, nowSec);
+
+      if (gaps.length > 0) {
+        const chunks = splitIntoChunks(gaps);
+        const totalSpan = gaps.reduce((acc, g) => acc + (g.e - g.s), 0);
+        bootLog(`${sym} — ${chunks.length} chunk(s), ~${totalSpan}s of gaps`, '#4a9eff');
+        await fetchChunksSafely(sym, chunks, tickMap);
+      } else {
+        bootLog(`${sym} — fully cached, no gaps`, '#556');
+      }
+
+      // Merge any live ticks that arrived for this pair while we were backfilling it
+      Object.assign(tickMap, liveBuffer[sym]);
+      liveBuffer[sym] = {};
+
+      rebuildBucketsFromTickMap(p);
+      p.backfilled = true;
+      await cacheWrite(sym, dateStr, tickMap);
+
+      bootState[sym] = 'done';
+    } catch (e) {
+      bootState[sym] = 'err';
+      bootLog(`${sym} — backfill error: ${e.message || e}`, '#ff4444');
+    }
+
+    doneCount++;
+    bootGridRender();
+    bootProgress(doneCount, pairData.length);
+    document.getElementById('backfill-status').textContent =
+      `Backfilling: ${doneCount}/${pairData.length} pairs…`;
+    draw(); // progressively render as each pair finishes
+
+    if (i < pairData.length - 1) await sleep(INTER_PAIR_PAUSE);
+  }
+
+  document.getElementById('backfill-status').textContent = '';
+  bootLog('[PHASE 2] All pairs synchronized.', '#22cc66');
+  bootStatusLine('READY — moving to live feed…');
+}
+
+/* ═══════════════════════════════════════════════
+   LIVE WEBSOCKET (persistent, after backfill)
+═══════════════════════════════════════════════ */
+let ws = null;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    wsReady = true;
+    document.getElementById('conn-status').textContent = 'Connected';
+    document.getElementById('live-dot').classList.add('on');
+    dayOpenMs = getTodayMidnightMs();
+    runBootSequence();
+  };
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.msg_type === 'tick') {
+      handleLiveTick(msg.tick);
+    }
+  };
+
+  ws.onerror = () => {
+    document.getElementById('conn-status').textContent = 'Error — retrying…';
+    document.getElementById('live-dot').classList.remove('on');
+  };
+
+  ws.onclose = () => {
+    wsReady = false;
+    document.getElementById('conn-status').textContent = 'Disconnected — retrying…';
+    document.getElementById('live-dot').classList.remove('on');
+    setTimeout(connect, 3000);
+  };
+}
+
+/* ─── Orchestrates the full boot: cache hydrate → live-buffer-start → backfill → subscribe ─── */
+async function runBootSequence() {
+  PAIRS.forEach(p => { bootState[p.sym] = 'wait'; });
+  bootGridRender();
+
+  // Start buffering live ticks immediately so nothing is lost while phase 1/2 run.
+  subscribeAllLive();
+
+  await hydrateFromCache();
+  await backfillAllPairs();
+
+  bootDone();
+}
+
+/* ─── Live subscription — starts EARLY (during boot) so ticks buffer correctly ─── */
+let liveSubIndex = 0;
+function subscribeAllLive() {
+  liveSubIndex = 0;
+  subscribeNextLive();
+}
+function subscribeNextLive() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (liveSubIndex >= PAIRS.length) return;
+  const sym = PAIRS[liveSubIndex].sym;
+  ws.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
+  liveSubIndex++;
+  if (liveSubIndex < PAIRS.length) setTimeout(subscribeNextLive, 60);
+}
+
+function unsubscribeAll() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ forget_all: 'ticks' }));
+  }
+}
+
+function handleLiveTick(tick) {
+  const idx = symToIdx[tick.symbol];
+  if (idx === undefined || resetting) return;
+  const p = pairData[idx];
+  const sec = tick.epoch;
+
+  // While this pair hasn't finished backfilling yet, buffer instead of inserting directly —
+  // rebuildBucketsFromTickMap() will wipe and replay buckets from tickMaps at the end of
+  // backfill, so a direct insert here would just get discarded anyway. Buffering guarantees
+  // it survives that rebuild.
+  if (!p.backfilled) {
+    liveBuffer[p.sym][sec] = tick.quote;
+  }
+
+  tickMaps[p.sym][sec] = tick.quote;
+  insertTick(p, sec * 1000, tick.quote);
+  finalizeBucketKeys(p); // cheap: usually appending at the end, sort is near-sorted
+
+  const elPx  = document.getElementById('lp-' + p.label);
+  const elPct = document.getElementById('ld-' + p.label);
+  const last  = p.buckets.get(p.lastBucketIdx);
+  if (elPx)  elPx.textContent  = p.price.toFixed(p.price > 10 ? 3 : 5);
+  if (elPct && last) {
+    elPct.textContent = (last.pct >= 0 ? '+' : '') + last.pct.toFixed(3) + '%';
+    elPct.style.color = last.pct >= 0 ? '#22cc66' : '#ee4444';
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   RESET — fires on UTC midnight rollover
+═══════════════════════════════════════════════ */
+function resetDay() {
+  resetting = true;
+  document.getElementById('reset-badge').style.display = 'block';
+  unsubscribeAll();
+  setTimeout(() => {
+    dayNum++;
+    dayOpenMs = getTodayMidnightMs();
+    document.getElementById('cycle-lbl').textContent = 'Day ' + dayNum;
+
+    pairData.forEach(p => {
+      p.buckets = new Map();
+      p.bucketKeys = [];
+      p.open = null;
+      p.price = null;
+      p.lastBucketIdx = -1;
+      p.backfilled = false;
+      tickMaps[p.sym] = {};
+      liveBuffer[p.sym] = {};
+    });
+
+    resetting = false;
+    document.getElementById('reset-badge').style.display = 'none';
+
+    // Re-show boot overlay for the new day's backfill
+    const old = document.getElementById('bootOverlay');
+    if (old) old.remove();
+    const fresh = document.createElement('div');
+    fresh.id = 'bootOverlay';
+    fresh.innerHTML = `
+      <div id="bootInner">
+        <div id="bootTitle">⬡ NEW UTC DAY — BACKFILL BOOT SEQUENCE</div>
+        <div id="bootBarTrack"><div id="bootBarFill"></div></div>
+        <div id="bootGrid"></div>
+        <div id="bootLogBox"><div id="bootLogLines"></div></div>
+        <div id="bootStatusLine">INITIALIZING...</div>
+      </div>`;
+    document.body.appendChild(fresh);
+
+    runBootSequence();
+  }, 800);
+}
+
+/* ═══════════════════════════════════════════════
+   Y RANGE
+═══════════════════════════════════════════════ */
+function getRange() {
+  let lo = 0, hi = 0;
+  pairData.forEach(p => {
+    p.bucketKeys.forEach(k => {
+      const tk = p.buckets.get(k);
+      if (tk.pct < lo) lo = tk.pct;
+      if (tk.pct > hi) hi = tk.pct;
+    });
+  });
+  const half = Math.max(Math.abs(lo), Math.abs(hi), 0.01);
+  const pad  = half * 0.22 + 0.005;
+  return { lo: -(half + pad), hi: half + pad };
+}
+
+/* ═══════════════════════════════════════════════
+   COORDINATE MAP — DAY_SECONDS wide, so per-tick
+   nodes compress automatically to fit one screen
+═══════════════════════════════════════════════ */
+function chartRight() { return W - PAD.r; }
+function mapX(elapsedSec) {
+  const clamped = Math.max(0, Math.min(elapsedSec, DAY_SECONDS));
+  return PAD.l + (clamped / DAY_SECONDS) * (chartRight() - PAD.l);
+}
+function mapY(pct, lo, hi) {
+  const cH = H - PAD.t - PAD.b;
+  return PAD.t + cH - ((pct - lo) / (hi - lo)) * cH;
+}
+
+/* ═══════════════════════════════════════════════
+   DRAW
+═══════════════════════════════════════════════ */
+function draw() {
+  if (!W || !H) return;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#000432';
+  ctx.fillRect(0, 0, W, H);
+
+  const { lo, hi } = getRange();
+  const cR = chartRight();
+
+  // --- Zero line ---
+  const zeroY = mapY(0, lo, hi);
+  ctx.strokeStyle = '#ff0000';
+  ctx.lineWidth   = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(PAD.l, zeroY); ctx.lineTo(W - 2, zeroY); ctx.stroke();
+
+  let totalBuckets = 0;
+
+  // --- Pair lines: stroke only, no per-point markers (cost control at 17k pts/day) ---
+  pairData.forEach(p => {
+    totalBuckets += p.bucketKeys.length;
+    if (p.bucketKeys.length < 2) return;
+
+    const path = new Path2D();
+    p.bucketKeys.forEach((k, i) => {
+      const tk = p.buckets.get(k);
+      const x = mapX(tk.elapsed);
+      const y = mapY(tk.pct, lo, hi);
+      i === 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+    });
+
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth   = 1.3;
+    ctx.stroke(path);
+    ctx.globalAlpha = 1;
+
+    // Markers only on the most recent few buckets — keeps live tip visible
+    // without paying arc() cost for thousands of historical points.
+    ctx.fillStyle = p.color;
+    const recentKeys = p.bucketKeys.slice(-MAX_LIVE_MARKERS);
+    recentKeys.forEach(k => {
+      const tk = p.buckets.get(k);
+      const x = mapX(tk.elapsed);
+      const y = mapY(tk.pct, lo, hi);
+      ctx.beginPath();
+      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+
+  document.getElementById('f-points').innerHTML = 'BUCKETS: <b>' + totalBuckets.toLocaleString() + '</b>';
+
+  // --- End-of-line labels ---
+  ctx.font      = 'bold 11px Courier New';
+  ctx.textAlign = 'left';
+  const LGAP   = 14;
+  const LSPACE = 15;
+
+  const labels = pairData
+    .filter(p => p.bucketKeys.length >= 1)
+    .map(p => {
+      const lastK = p.bucketKeys[p.bucketKeys.length - 1];
+      const last  = p.buckets.get(lastK);
+      return { p, tipX: mapX(last.elapsed), rawY: mapY(last.pct, lo, hi), last };
+    })
+    .sort((a, b) => a.rawY - b.rawY);
+
+  for (let i = 1; i < labels.length; i++) {
+    if (labels[i].rawY - labels[i-1].rawY < LSPACE)
+      labels[i].rawY = labels[i-1].rawY + LSPACE;
+  }
+  for (let i = labels.length - 2; i >= 0; i--) {
+    if (labels[i+1].rawY - labels[i].rawY < LSPACE)
+      labels[i].rawY = labels[i+1].rawY - LSPACE;
+  }
+
+  labels.forEach(({ p, tipX, rawY, last }) => {
+    const lx = tipX + LGAP;
+    const ly = Math.max(PAD.t + 6, Math.min(H - PAD.b - 2, rawY));
+    const clampedTipY = Math.max(PAD.t + 6, Math.min(H - PAD.b - 2, mapY(last.pct, lo, hi)));
+
+    ctx.save();
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth   = 0.8;
+    ctx.globalAlpha = 0.9;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(tipX, clampedTipY);
+    ctx.lineTo(lx - 2, ly);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.font = 'bold 11px Courier New';
+    const tw2 = ctx.measureText(p.label).width;
+    ctx.fillStyle = 'rgba(0,2,30,0.97)';
+    ctx.fillRect(lx - 3, ly - 12, tw2 + 7, 18);
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillText(p.label, lx + 0.7, ly + 1.7);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.label, lx, ly + 1);
+  });
+
+  // --- Border ---
+  ctx.save();
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = 2;
+  ctx.strokeRect(1.5, 1.5, W - 3, H - 3);
+  ctx.restore();
+}
+
+function fmtHMS(sec) {
+  const h = String(Math.floor(sec / 3600)).padStart(2,'0');
+  const m = String(Math.floor((sec % 3600) / 60)).padStart(2,'0');
+  const s = String(Math.floor(sec % 60)).padStart(2,'0');
+  return h + ':' + m + ':' + s;
+}
+
+function updateTimerUI() {
+  const elapsed = getElapsedSec();
+  document.getElementById('timer-fill').style.width = (elapsed / DAY_SECONDS * 100) + '%';
+  document.getElementById('timer-txt').textContent  = fmtHMS(elapsed) + ' / 24:00:00';
+  document.getElementById('hdr-time').textContent   = new Date().toUTCString().slice(17, 25) + ' UTC';
+
+  // Detect UTC midnight rollover: elapsed wraps from ~86399 back to ~0
+  if (elapsed < lastElapsed - 1 && !resetting) {
+    resetDay();
+  }
+  lastElapsed = elapsed;
+}
+
+/* ═══════════════════════════════════════════════
+   RESIZE + LOOP
+═══════════════════════════════════════════════ */
+function resize() {
+  const wrap = document.getElementById('chart-wrap');
+  const w = wrap.offsetWidth;
+  const h = wrap.offsetHeight;
+  if (w > 0 && h > 0 && (W !== w || H !== h)) {
+    W = w; H = h;
+    canvas.width  = W;
+    canvas.height = H;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+  }
+}
+
+function loop() {
+  resize();
+  draw();
+  updateTimerUI();
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize', resize);
+setTimeout(() => {
+  resize();
+  lastElapsed = getElapsedSec();
+  connect();
+  requestAnimationFrame(loop);
+}, 50);
+</script>
+</body>
+</html>
