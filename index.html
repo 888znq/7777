@@ -361,7 +361,15 @@ function bootDone() {
    BUCKET INSERT (shared by backfill + live)
 ═══════════════════════════════════════════════ */
 function insertTick(p, epochMs, price) {
-  if (p.open === null) p.open = price;
+  if (p.open === null) {
+    p.open = price;
+    // Seed the shared origin point immediately so the line has a fixed
+    // start at elapsed 0 / pct 0 the moment we know this pair's open price.
+    if (!p.buckets.has(0)) {
+      p.buckets.set(0, { elapsed: 0, pct: 0 });
+      p.bucketKeys.push(0);
+    }
+  }
   p.price = price;
 
   const elapsed = (epochMs - dayOpenMs) / 1000;
@@ -393,6 +401,15 @@ function rebuildBucketsFromTickMap(p) {
     const sec = epochs[i];
     insertTick(p, sec * 1000, map[sec]);
   }
+
+  // Anchor every line to the same shared origin (elapsed 0, pct 0) so all
+  // pairs visually start from the same point, regardless of when their
+  // first real tick happened to land.
+  if (p.open !== null && !p.buckets.has(0)) {
+    p.buckets.set(0, { elapsed: 0, pct: 0 });
+    p.bucketKeys.push(0);
+  }
+
   finalizeBucketKeys(p);
 }
 
